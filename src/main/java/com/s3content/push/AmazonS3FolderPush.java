@@ -1,5 +1,9 @@
 package com.s3content.push;
 
+import java.io.File;
+import java.io.FileReader;
+import java.util.Properties;
+
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentials;
@@ -9,16 +13,23 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ListObjectsRequest;
 import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
+import com.s3content.util.CommonUtility;
 
 public class AmazonS3FolderPush {
 
 	private static AmazonS3  s3client;
 	private static String bucketName = "connect-nonprod.mheducation.com";
 	
-	public static void main(String[] args) {
+	public static void main(String[] args) throws Exception {
 		// TODO Auto-generated method stub
 		String accessKey = "";
 		String secretKey = "";
+		
+		Properties properties = new Properties();
+		CommonUtility commonUtility = new CommonUtility();
+		properties.load(new FileReader(commonUtility.getPropertyFile("awsconfig.properties")));
+		accessKey = properties.getProperty("amazons3.accesskey");
+		secretKey = properties.getProperty("amazons3.secretkey");
 		AWSCredentials aWSCredentials = new BasicAWSCredentials(accessKey, secretKey); 
 
 		s3client = new AmazonS3Client(aWSCredentials);
@@ -32,11 +43,8 @@ public class AmazonS3FolderPush {
             ObjectListing objectListing;
             do {
                 objectListing = s3client.listObjects(listObjectsRequest);
-                for (S3ObjectSummary objectSummary : 
-                	objectListing.getObjectSummaries()) {
-                    System.out.println(" - " + objectSummary.getKey() + "  " +
-                            "(size = " + objectSummary.getSize() + 
-                            ")");
+                for (S3ObjectSummary objectSummary : objectListing.getObjectSummaries()) {
+                    System.out.println(" - " + objectSummary.getKey() + "  " + "(size = " + objectSummary.getSize() + ")");
                 }
                 listObjectsRequest.setMarker(objectListing.getNextMarker());
             } while (objectListing.isTruncated());
