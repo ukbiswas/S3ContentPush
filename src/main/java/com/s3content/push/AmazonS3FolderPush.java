@@ -1,6 +1,5 @@
 package com.s3content.push;
 
-import java.io.File;
 import java.io.FileReader;
 import java.util.Properties;
 
@@ -30,6 +29,10 @@ public class AmazonS3FolderPush {
 		properties.load(new FileReader(commonUtility.getPropertyFile("awsconfig.properties")));
 		accessKey = properties.getProperty("amazons3.accesskey");
 		secretKey = properties.getProperty("amazons3.secretkey");
+		String sourceBucket = properties.getProperty("amazons3.source.bucket");
+		String destinationBucket = properties.getProperty("amazons3.destination.bucket");
+		String sourceFolder = properties.getProperty("amazons3.source.folder");
+		String destinationFolder = properties.getProperty("amazons3.destination.folder");
 		AWSCredentials aWSCredentials = new BasicAWSCredentials(accessKey, secretKey); 
 
 		s3client = new AmazonS3Client(aWSCredentials);
@@ -41,10 +44,16 @@ public class AmazonS3FolderPush {
                 .withBucketName(bucketName)
                 .withPrefix("Media/Development/Media/test/Externalized/");
             ObjectListing objectListing;
+            String destinationObjectKey = null;
+            String sourceObjectKey = null;
             do {
                 objectListing = s3client.listObjects(listObjectsRequest);
                 for (S3ObjectSummary objectSummary : objectListing.getObjectSummaries()) {
-                    System.out.println(" - " + objectSummary.getKey() + "  " + "(size = " + objectSummary.getSize() + ")");
+                	sourceObjectKey = objectSummary.getKey();
+                    System.out.println(" - " + sourceObjectKey + "  " + "(size = " + objectSummary.getSize() + ")");
+                    destinationObjectKey = commonUtility.getDestinationObjectKey(sourceObjectKey, sourceFolder, destinationFolder);
+                    s3client.copyObject(sourceBucket, sourceObjectKey, destinationBucket, destinationObjectKey);
+                    System.out.println("Object "+sourceObjectKey +" copied to "+destinationObjectKey);
                 }
                 listObjectsRequest.setMarker(objectListing.getNextMarker());
             } while (objectListing.isTruncated());
