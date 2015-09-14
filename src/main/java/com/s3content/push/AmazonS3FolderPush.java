@@ -2,6 +2,7 @@ package com.s3content.push;
 
 import java.io.FileReader;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -20,26 +21,21 @@ import com.s3content.util.AmazonS3Constant;
 import com.s3content.util.CommonUtility;
 
 public class AmazonS3FolderPush extends Thread {
-
-	private static AmazonS3  s3client;
-	private static String accessKey;
-	private static String secretKey;
-	private static String sourceBucket;
-	private static String destinationBucket;
-	private static String sourceFolder;
-	private static String destinationFolder;
-	private static AWSCredentials aWSCredentials;
-	private static int noOfThread;
-	private static int iSourceObjectLength;
+	private static AmazonS3  				s3client;
+	private static String    				accessKey;
+	private static String    				secretKey;
+	private static String    				sourceBucket;
+	private static String    				destinationBucket;
+	private static String    				sourceFolder;
+	private static String    				destinationFolder;
+	private static int       				noOfThread;
+	private static int       				iSourceObjectLength;
+	private static Date      				fromDate;	
+	static boolean							fromDateToBeConsidered;	
+	private static List<S3ObjectSummary>	sourceS3ObjectKeyList;
+	private static List<String>				failedObjectList;
 	
-	private static Date fromDate;	
-	static boolean fromDateToBeConsidered;
-	
-	private static List<S3ObjectSummary> s3ObjectSummaryList;
-	
-	public static void main(String[] args) throws Exception {
-
-		
+	public static void main(String[] args) throws Exception {		
 		Properties properties = new Properties();
 		CommonUtility commonUtility = new CommonUtility();
 		properties.load(new FileReader(commonUtility.getPropertyFile("awsconfig.properties")));
@@ -52,34 +48,40 @@ public class AmazonS3FolderPush extends Thread {
 		
 		noOfThread = CommonUtility.getThreadValueInt(properties.getProperty("amazons3.folderCopy.noOfThread"));
 		
-		aWSCredentials = new BasicAWSCredentials(accessKey, secretKey); 
+		AWSCredentials aWSCredentials = new BasicAWSCredentials(accessKey, secretKey); 
 		s3client = new AmazonS3Client(aWSCredentials);
-		
+		sourceS3ObjectKeyList = new ArrayList<S3ObjectSummary>();
+		failedObjectList = new ArrayList<String>();
 		try {
             System.out.println("Listing objects");
    
             ListObjectsRequest listObjectsRequest = new ListObjectsRequest().withBucketName(sourceBucket).withPrefix(sourceFolder);
             ObjectListing objectListing;
-            String destinationObjectKey = null;
-            String sourceObjectKey = null;
+            //String destinationObjectKey = null;
+            //String sourceObjectKey = null;
             do {
                 objectListing = s3client.listObjects(listObjectsRequest);
-                s3ObjectSummaryList = objectListing.getObjectSummaries();
-                iSourceObjectLength = s3ObjectSummaryList.size()-1;
-                for (S3ObjectSummary objectSummary : s3ObjectSummaryList) {
-                	sourceObjectKey = objectSummary.getKey();
+                /*
+                for (S3ObjectSummary objectSummary : objectListing.getObjectSummaries()) {
+                	sourceS3ObjectKeyList.add(objectSummary.getKey());
                     System.out.println(" - " + sourceObjectKey + "  " + "(size = " + objectSummary.getSize() + ")");
                     destinationObjectKey = CommonUtility.getDestinationObjectKey(sourceObjectKey, sourceFolder, destinationFolder);
                     s3client.copyObject(sourceBucket, sourceObjectKey, destinationBucket, destinationObjectKey);
                     System.out.println("Object "+sourceObjectKey +" copied to "+destinationObjectKey);
-                }
+                }*/
+                sourceS3ObjectKeyList.addAll(objectListing.getObjectSummaries());
                 listObjectsRequest.setMarker(objectListing.getNextMarker());
             } while (objectListing.isTruncated());
+            
+            iSourceObjectLength = sourceS3ObjectKeyList.size() - 1;
+            
+            for (int iThreadCounter=0; iThreadCounter < noOfThread; iThreadCounter++ ) {
+            	AmazonS3FolderPush amazonS3FolderPush = new AmazonS3FolderPush();
+            	amazonS3FolderPush.start();
+            }
          } catch (AmazonServiceException ase) {
-            System.out.println("Caught an AmazonServiceException, " +
-            		"which means your request made it " +
-                    "to Amazon S3, but was rejected with an error response " +
-                    "for some reason.");
+            System.out.println("Caught an AmazonServiceException, which means your request made it " +
+                    "to Amazon S3, but was rejected with an error response for some reason.");
             System.out.println("Error Message:    " + ase.getMessage());
             System.out.println("HTTP Status Code: " + ase.getStatusCode());
             System.out.println("AWS Error Code:   " + ase.getErrorCode());
@@ -98,25 +100,46 @@ public class AmazonS3FolderPush extends Thread {
 	public void run() {
 		System.out.println("## Copy process going on....in :"+this.getName());
 		int noOfCopiedFiles = 0;//holds no of copied file for this thread
-		S3ObjectSummary s3ObjectSummary = null;
 		String sourceObjectKey = null;
 		String destinationObjectKey = null;
+		S3ObjectSummary s3ObjectSummary = null;
 		while (iSourceObjectLength >= 0) {
-			synchronized (s3ObjectSummaryList) {
-				s3ObjectSummary = s3ObjectSummaryList.get(iSourceObjectLength);
-				iSourceObjectLength = iSourceObjectLength-1;
-			}
+			reduceCounter();
+			s3ObjectSummary = sourceS3ObjectKeyList.get(iSourceObjectLength);
 			sourceObjectKey = s3ObjectSummary.getKey();
 			//if the copy process needs to skip this objects
 			if (CommonUtility.isCopyToBeSkipped(sourceObjectKey)) {
 				continue;
 			}
 			// if from date is available and objects modification date is earlier than that, the skip it
-			if (fromDateToBeConsidered && s3ObjectSummary.getLastModified().before(fromDate) ){//skip those objects which are modified before fromDate
+			//skip those objects which are modified before fromDate
+			if (fromDateToBeConsidered && s3ObjectSummary.getLastModified().before(fromDate) ){
 				continue;
 			}
-			destinationObjectKey = CommonUtility.getDestinationObjectKey(sourceObjectKey, sourceFolder, destinationFolder);
+			try {
+				destinationObjectKey = CommonUtility.getDestinationObjectKey(sourceObjectKey, sourceFolder, destinationFolder);
+				s3client.copyObject(sourceBucket, sourceObjectKey, destinationBucket, destinationObjectKey);
+				noOfCopiedFiles++;
+			} catch (AmazonServiceException ase) {
+	            System.out.println("Error Message:    " + ase.getMessage()
+	            				   + "\nHTTP Status Code: " + ase.getStatusCode()
+	            				   + "\nAWS Error Code:   " + ase.getErrorCode()
+	            				   + "\nError Type:       " + ase.getErrorType()
+	            				   + "\nRequest ID:       " + ase.getRequestId());
+	            failedObjectList.add(sourceObjectKey);
+	        } catch (AmazonClientException ace) {
+	            System.out.println("Error Message: " + ace.getMessage());
+	            failedObjectList.add(sourceObjectKey);
+	        }
+			
+			if (iSourceObjectLength == 0 && !failedObjectList.isEmpty()) {
+				System.out.println("Objects failed to copy :");
+				for (String failedObjectKey :  failedObjectList) {
+					System.out.println("\n\t : " + failedObjectKey);
+				}
+			}
 		}
+		System.out.println("Number of objects copied by "+this.getName() +" : "+noOfCopiedFiles);
 	}
 	
 	/**
@@ -138,5 +161,9 @@ public class AmazonS3FolderPush extends Thread {
 			System.out.println(AmazonS3Constant.MESSAGE_EXCEPTION_DATE_FORMATING);
 		}
 		return isFromDateValid;
+	}
+	
+	private static synchronized void reduceCounter() {
+		iSourceObjectLength = iSourceObjectLength - 1;
 	}
 }

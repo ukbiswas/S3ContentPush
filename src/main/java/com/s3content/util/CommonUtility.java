@@ -3,8 +3,6 @@ package com.s3content.util;
 import java.io.File;
 import org.apache.commons.lang3.StringUtils;
 
-import com.amazons3copy.AmazonS3CopyUtility;
-
 public class CommonUtility {
 	public File getPropertyFile(String propertyFileName) {
 		ClassLoader classLoader = getClass().getClassLoader();
