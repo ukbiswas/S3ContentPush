@@ -1,10 +1,7 @@
 package com.s3content.push;
 
 import java.io.FileReader;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
 import java.util.Properties;
 
@@ -17,10 +14,9 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ListObjectsRequest;
 import com.amazonaws.services.s3.model.ObjectListing;
 import com.amazonaws.services.s3.model.S3ObjectSummary;
-import com.s3content.util.AmazonS3Constant;
 import com.s3content.util.CommonUtility;
 
-public class AmazonS3FolderPush extends Thread {
+public class AmazonS3FolderCopy extends Thread {
 	private static AmazonS3  				s3client;
 	private static String    				accessKey;
 	private static String    				secretKey;
@@ -30,9 +26,7 @@ public class AmazonS3FolderPush extends Thread {
 	private static String    				destinationFolder;
 	private static int       				noOfThread;
 	private static int       				iSourceObjectLength;
-	private static Date      				fromDate;
-	static boolean							fromDateToBeConsidered;	
-	private static List<S3ObjectSummary>	sourceS3ObjectKeyList;
+	private static List<String>	            sourceS3ObjectKeyList;
 	private static List<String>				failedObjectList;
 	
 	public static void main(String[] args) throws Exception {		
@@ -47,30 +41,21 @@ public class AmazonS3FolderPush extends Thread {
 		destinationFolder = properties.getProperty("amazons3.destination.folder");
 		
 		noOfThread = CommonUtility.getThreadValueInt(properties.getProperty("amazons3.folderCopy.noOfThread"));
-		String fromDateString = properties.getProperty("amazons3.folderCopy.fromDate");
 		
 		AWSCredentials aWSCredentials = new BasicAWSCredentials(accessKey, secretKey); 
 		s3client = new AmazonS3Client(aWSCredentials);
-		sourceS3ObjectKeyList = new ArrayList<S3ObjectSummary>();
+		sourceS3ObjectKeyList = new ArrayList<String>();
 		failedObjectList = new ArrayList<String>();
 		try {
             System.out.println("Listing objects....");
-            validateFromDatePropertyValue(fromDateString);
             ListObjectsRequest listObjectsRequest = new ListObjectsRequest().withBucketName(sourceBucket).withPrefix(sourceFolder);
             ObjectListing objectListing;
-            //String destinationObjectKey = null;
-            //String sourceObjectKey = null;
             do {
                 objectListing = s3client.listObjects(listObjectsRequest);
-                /*
+                
                 for (S3ObjectSummary objectSummary : objectListing.getObjectSummaries()) {
-                	sourceS3ObjectKeyList.add(objectSummary.getKey());
-                    System.out.println(" - " + sourceObjectKey + "  " + "(size = " + objectSummary.getSize() + ")");
-                    destinationObjectKey = CommonUtility.getDestinationObjectKey(sourceObjectKey, sourceFolder, destinationFolder);
-                    s3client.copyObject(sourceBucket, sourceObjectKey, destinationBucket, destinationObjectKey);
-                    System.out.println("Object "+sourceObjectKey +" copied to "+destinationObjectKey);
-                }*/
-                sourceS3ObjectKeyList.addAll(objectListing.getObjectSummaries());
+                    sourceS3ObjectKeyList.add(objectSummary.getKey());
+                }
                 listObjectsRequest.setMarker(objectListing.getNextMarker());
             } while (objectListing.isTruncated());
             
@@ -79,8 +64,8 @@ public class AmazonS3FolderPush extends Thread {
             System.out.println("iSourceObjectLength="+iSourceObjectLength);
             
             for (int iThreadCounter=0; iThreadCounter < noOfThread; iThreadCounter++ ) {
-            	AmazonS3FolderPush amazonS3FolderPush = new AmazonS3FolderPush();
-            	amazonS3FolderPush.start();
+            	AmazonS3FolderCopy amazonS3FolderCopy = new AmazonS3FolderCopy();
+            	amazonS3FolderCopy.start();
             }
          } catch (AmazonServiceException ase) {
             System.out.println("Caught an AmazonServiceException, which means your request made it " +
@@ -105,14 +90,11 @@ public class AmazonS3FolderPush extends Thread {
 		int noOfCopiedFiles = 0;//holds no of copied file for this thread
 		String sourceObjectKey = null;
 		String destinationObjectKey = null;
-		S3ObjectSummary s3ObjectSummary = null;
 		while (iSourceObjectLength >= 0) {
 			synchronized (sourceS3ObjectKeyList) {
-				s3ObjectSummary = sourceS3ObjectKeyList.get(iSourceObjectLength);
+				sourceObjectKey = sourceS3ObjectKeyList.get(iSourceObjectLength);
 				iSourceObjectLength = iSourceObjectLength - 1;
 			}
-			
-			sourceObjectKey = s3ObjectSummary.getKey();
 			//if the copy process needs to skip this objects
 			if (CommonUtility.isCopyToBeSkipped(sourceObjectKey)) {
 				continue;
@@ -121,7 +103,6 @@ public class AmazonS3FolderPush extends Thread {
 			try {
 				destinationObjectKey = CommonUtility.getDestinationObjectKey(sourceObjectKey, sourceFolder, destinationFolder);
 				s3client.copyObject(sourceBucket, sourceObjectKey, destinationBucket, destinationObjectKey);
-				//System.out.println("## "+sourceObjectKey);
 				noOfCopiedFiles++;
 			} catch (AmazonServiceException ase) {
 	            System.out.println("Error Message:    " + ase.getMessage()
@@ -146,28 +127,5 @@ public class AmazonS3FolderPush extends Thread {
 			}
 		}
 		System.out.println("Number of objects copied by "+this.getName() +" : "+noOfCopiedFiles);
-	}
-	
-	/**
-	 * This method validates from date. if the date is not parse able it returns false.
-	 * Also it sets a flag to indicate if the copy process should use from date limit. 
-	 * @return boolean
-	 * @throws Exception
-	 */
-	public static boolean validateFromDatePropertyValue(String dateInStringFormat) throws Exception {
-		boolean isFromDateValid = true;
-		try {
-			SimpleDateFormat date_format = new SimpleDateFormat("dd/MM/yyyy");
-			fromDate = date_format.parse(dateInStringFormat);
-			System.out.println("fromDate="+fromDate);
-			Calendar calDate = Calendar.getInstance();
-			calDate.setTime(fromDate);
-			System.out.println("calDate="+calDate);
-			fromDateToBeConsidered = true;//this indicates if from date to be considered
-		} catch(Exception ex) {
-			isFromDateValid = false;
-			System.out.println(AmazonS3Constant.MESSAGE_EXCEPTION_DATE_FORMATING);
-		}
-		return isFromDateValid;
 	}
 }

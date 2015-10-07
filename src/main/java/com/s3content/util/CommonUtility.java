@@ -12,17 +12,17 @@ public class CommonUtility {
 
 	/**
 	 * This method makes the target object key/path.
-	 * @param sourveObjectKey
+	 * @param sourceObjectKey
 	 * @param sourceFolder
 	 * @param destinationFolder
 	 * @return String
 	 * @throws Exception
 	 */
-	public static String getDestinationObjectKey(String sourveObjectKey, String sourceFolder, String destinationFolder) {
+	public static String getDestinationObjectKey(String sourceObjectKey, String sourceFolder, String destinationFolder) {
 		String targetFilepath = null;//target object reference
 		//perform null and blank check for source object key and source folder
-		if(StringUtils.isNotBlank(sourveObjectKey) && StringUtils.isNotBlank(sourceFolder)){
-			targetFilepath = sourveObjectKey.substring(sourceFolder.length());//take the remaining portion after source folder
+		if(StringUtils.isNotBlank(sourceObjectKey) && StringUtils.isNotBlank(sourceFolder)){
+			targetFilepath = sourceObjectKey.substring(sourceFolder.length());//take the remaining portion after source folder
 			targetFilepath = destinationFolder + targetFilepath; //prepend destination folder to make the target key
 		}	
 		return targetFilepath;
