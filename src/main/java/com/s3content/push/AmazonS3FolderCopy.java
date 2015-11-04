@@ -32,7 +32,7 @@ public class AmazonS3FolderCopy extends Thread {
 	public static void main(String[] args) throws Exception {		
 		Properties properties = new Properties();
 		CommonUtility commonUtility = new CommonUtility();
-		properties.load(new FileReader(commonUtility.getPropertyFile("awsconfig.properties")));
+		properties.load(new FileReader(commonUtility.getPropertyFile("awsconfig-foldercopy.properties")));
 		accessKey = properties.getProperty("amazons3.accesskey");
 		secretKey = properties.getProperty("amazons3.secretkey");
 		sourceBucket = properties.getProperty("amazons3.source.bucket");
@@ -102,9 +102,11 @@ public class AmazonS3FolderCopy extends Thread {
 			
 			try {
 				destinationObjectKey = CommonUtility.getDestinationObjectKey(sourceObjectKey, sourceFolder, destinationFolder);
+				System.out.println("sourceObjectKey : "+sourceObjectKey+", destinationObjectKey :"+destinationObjectKey);
 				s3client.copyObject(sourceBucket, sourceObjectKey, destinationBucket, destinationObjectKey);
 				noOfCopiedFiles++;
 			} catch (AmazonServiceException ase) {
+				ase.printStackTrace();
 	            System.out.println("Error Message:    " + ase.getMessage()
 	            				   + "\n\tHTTP Status Code: " + ase.getStatusCode()
 	            				   + "\n\tAWS Error Code:   " + ase.getErrorCode()
