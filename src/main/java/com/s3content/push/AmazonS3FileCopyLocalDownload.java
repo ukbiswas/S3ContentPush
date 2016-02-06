@@ -25,8 +25,8 @@ public class AmazonS3FileCopyLocalDownload {
 	private static AmazonS3  				destS3client;
 	private static String    				sourceBucket;
 	private static String    				destinationBucket;
-	private static String    				sourceEnvironment;
-	private static String    				destEnvironment;
+	private static String    				sourceFolder;
+	private static String    				destFolder;
 	private static int       				iSourceObjectLength;
 	static boolean							fromDateToBeConsidered;	
 	private static List<String>				failedObjectList;
@@ -43,8 +43,8 @@ public class AmazonS3FileCopyLocalDownload {
 		
 		sourceBucket = properties.getProperty("amazons3.source.bucket");
 		destinationBucket = properties.getProperty("amazons3.destination.bucket");
-		sourceEnvironment = properties.getProperty("amazons3.source.env");
-		destEnvironment = properties.getProperty("amazons3.destination.env");
+		sourceFolder = properties.getProperty("amazons3.source.folder");
+		destFolder = properties.getProperty("amazons3.destination.folder");
 		
 		sourceS3client = new AmazonS3Client(new BasicAWSCredentials(sourceAccessKey, sourceSecretKey));
 		destS3client = new AmazonS3Client(new BasicAWSCredentials(destAccessKey, destSecretKey));
@@ -63,7 +63,8 @@ public class AmazonS3FileCopyLocalDownload {
             	
             	try {
             		s3Object = sourceS3client.getObject(sourceBucket, sourceObjectKey);
-            		destinationObjectKey = sourceObjectKey.replace(sourceEnvironment, destEnvironment);
+            		destinationObjectKey = sourceObjectKey.replace(sourceFolder, destFolder);
+            		System.out.println("## destinationObjectKey="+destinationObjectKey);
                     objectMetadata = s3Object.getObjectMetadata();
                     destS3client.putObject(destinationBucket, destinationObjectKey, s3Object.getObjectContent(), objectMetadata);
                     iSourceObjectLength++;
