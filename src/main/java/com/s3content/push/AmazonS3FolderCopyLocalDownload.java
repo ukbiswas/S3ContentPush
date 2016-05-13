@@ -36,7 +36,7 @@ public class AmazonS3FolderCopyLocalDownload {
 	public static void main(String[] args) throws Exception {		
 		Properties properties = new Properties();
 		CommonUtility commonUtility = new CommonUtility();
-		properties.load(new FileReader(commonUtility.getPropertyFile("foldercopylocaldownload.properties")));
+		properties.load(new FileReader(commonUtility.getPropertyFile("foldercopy-localdownload.properties")));
 		sourceAccessKey = properties.getProperty("amazons3.source.accesskey");
 		sourceSecretKey = properties.getProperty("amazons3.source.secretkey");
 		
