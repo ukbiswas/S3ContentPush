@@ -32,7 +32,7 @@ public class AmazonS3FolderCopy extends Thread {
 	public static void main(String[] args) throws Exception {		
 		Properties properties = new Properties();
 		CommonUtility commonUtility = new CommonUtility();
-		properties.load(new FileReader(commonUtility.getPropertyFile("awsconfig-foldercopy.properties")));
+		properties.load(new FileReader(commonUtility.getPropertyFile("AmazonS3FolderCopy.properties")));
 		accessKey = properties.getProperty("amazons3.accesskey");
 		secretKey = properties.getProperty("amazons3.secretkey");
 		sourceBucket = properties.getProperty("amazons3.source.bucket");
