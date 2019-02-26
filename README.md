@@ -8,6 +8,5 @@ Build:
   mvn clean install
   
 Run:
-Run AmazonS3FolderCopy as java application in eclipse
-Or
-run 'java -cp <project location/target/s3contentpush-v1.0.jar com.s3content.push.AmazonS3FolderCopy' in command prompt
+    1. Run AmazonS3FolderCopy as java application in eclipse OR
+    2. Run 'java -cp <project location/target/s3contentpush-v1.0.jar com.s3content.push.AmazonS3FolderCopy' in command prompt
