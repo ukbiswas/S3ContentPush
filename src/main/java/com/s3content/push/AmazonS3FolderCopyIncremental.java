@@ -7,6 +7,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Properties;
 
+import org.apache.commons.lang3.StringUtils;
+
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentials;
@@ -37,7 +39,7 @@ public class AmazonS3FolderCopyIncremental extends Thread {
 	public static void main(String[] args) throws Exception {		
 		Properties properties = new Properties();
 		CommonUtility commonUtility = new CommonUtility();
-		properties.load(new FileReader(commonUtility.getPropertyFile("awsconfig.properties")));
+		properties.load(new FileReader(commonUtility.getPropertyFile("AmazonS3FolderCopyIncremental.properties")));
 		accessKey = properties.getProperty("amazons3.accesskey");
 		secretKey = properties.getProperty("amazons3.secretkey");
 		sourceBucket = properties.getProperty("amazons3.source.bucket");
@@ -108,14 +110,16 @@ public class AmazonS3FolderCopyIncremental extends Thread {
 			}
 			// if from date is available and objects modification date is earlier than that, the skip it
 			//skip those objects which are modified before fromDate
-			if (fromDateToBeConsidered && s3ObjectSummary.getLastModified().before(fromDate) ){
+			if (fromDateToBeConsidered && s3ObjectSummary.getLastModified().after(fromDate) ){//to excuse the latest file//change it to before to excuse older files
 				continue;
 			}
 			try {
 				destinationObjectKey = CommonUtility.getDestinationObjectKey(sourceObjectKey, sourceFolder, destinationFolder);
 				s3client.copyObject(sourceBucket, sourceObjectKey, destinationBucket, destinationObjectKey);
-				System.out.println("## "+sourceObjectKey);
+				//s3client.deleteObject(sourceBucket, sourceObjectKey);
+				System.out.println("## "+sourceObjectKey+" & modi-time: "+s3ObjectSummary.getLastModified());
 				noOfCopiedFiles++;
+
 			} catch (AmazonServiceException ase) {
 	            System.out.println("Error Message:    " + ase.getMessage()
 	            				   + "\n\tHTTP Status Code: " + ase.getStatusCode()
@@ -150,11 +154,15 @@ public class AmazonS3FolderCopyIncremental extends Thread {
 	public static boolean validateFromDatePropertyValue(String dateInStringFormat) throws Exception {
 		boolean isFromDateValid = true;
 		try {
-			SimpleDateFormat date_format = new SimpleDateFormat("dd/MM/yyyy");
-			fromDate = date_format.parse(dateInStringFormat);
-			//Calendar calDate = Calendar.getInstance();
-			//calDate.setTime(fromDate);
-			fromDateToBeConsidered = true;//this indicates if from date to be considered
+			if(StringUtils.isNotBlank(dateInStringFormat)) {
+				SimpleDateFormat date_format = new SimpleDateFormat("dd/MM/yyyy");
+				fromDate = date_format.parse(dateInStringFormat);
+				//Calendar calDate = Calendar.getInstance();
+				//calDate.setTime(fromDate);
+				fromDateToBeConsidered = true;//this indicates if from date to be considered
+			} else {
+				System.out.println("fromDate is not provided, so copying all objects");
+			}
 		} catch(Exception ex) {
 			isFromDateValid = false;
 			System.out.println(AmazonS3Constant.MESSAGE_EXCEPTION_DATE_FORMATING);
